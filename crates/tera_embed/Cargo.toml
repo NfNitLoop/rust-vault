@@ -1,0 +1,26 @@
+[package]
+name = "tera_embed"
+version = "0.1.0"
+edition = "2018"
+description = "Tera + RustEmbed to embed your Tera templates in your binary."
+
+[features]
+default = []
+
+# Enable tide/tera integration.
+tide-tera-ext = ["tide", "tide-tera"]
+
+
+[dependencies]
+tera = "1.6"
+rust-embed = "6.2"
+serde = "*"
+
+
+[dependencies.tide-tera]
+optional = true
+version = "0.2"
+
+[dependencies.tide]
+optional = true
+version = "0.16"
