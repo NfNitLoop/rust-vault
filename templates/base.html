@@ -1,10 +1,26 @@
 <html>
-    <head>
-        <title>{{title | default(value="Vault")}}</title>
-    </head>
-    <body>
-        {% block body %}
-        Your body here
-        {% endblock %}
-    </body>
-</html>
+<head>
+    <title>{{ title | default(value="Title") }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+{% if nav %}
+    <div class="nav">
+    {% for navItem in nav %}
+        {% if navItem.link == relPath %}
+            <a href="{{navItem.link}}" class="active">{{navItem.title}}</a>
+        {% elif not navItem.hidden %}
+            <a href="{{navItem.link}}">{{navItem.title}}</a>
+        {% endif %}
+    {% endfor %}
+    </div>
+{% endif %}
+{% if flash %}
+    <div class="flash {{flash.type}}">{{ flash.message }}</div>
+{% endif %}
+
+{% block body %}
+Body goes here
+{% endblock %}
+</body>

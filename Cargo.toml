@@ -12,6 +12,9 @@ serde = { version = "1.0", features = ["derive"] }
 
 tera = "1.12"
 tide-tera = "0.2"
+webbrowser = "*"
+stop-token = "0.4"
+futures = "0.3"
 
 [dependencies.tera_embed]
 path = "./crates/tera_embed"
