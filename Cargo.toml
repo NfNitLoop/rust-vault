@@ -6,6 +6,9 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "*"
+structopt = "0.3"
+
 tide = "0.16"
 async-std = { version = "1.8.0", features = ["attributes"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -15,6 +18,7 @@ tide-tera = "0.2"
 webbrowser = "*"
 stop-token = "0.4"
 futures = "0.3"
+mime_guess = "*"
 
 [dependencies.tera_embed]
 path = "./crates/tera_embed"

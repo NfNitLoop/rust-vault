@@ -1,0 +1,51 @@
+.nav a {
+    display: inline-block;
+    border-radius: 5px;
+    padding: 5px;
+    background-color: #888;
+    color: white;
+    text-decoration: none;
+    cursor: pointer;
+    margin: 3px;
+}
+
+.nav a.active {
+    text-decoration: underline
+}
+
+textarea.post {
+    min-height: 20em;
+    width: 60em;
+    margin: 1rem 0;
+}
+
+div.entry {
+    border: 2px solid #d6d5d5;
+    margin: 1rem 0.5rem;
+    padding: 0.5rem;
+    border-radius: 5px;
+}
+
+.flash.success {
+    border: 2px solid #005500;
+    background-color: #62ff6230;
+    margin: 1em 0;
+    padding: 0.5rem;
+}
+
+.flash.success:before {
+    content: "✅";
+    margin-right: 0.5rem;
+}
+
+.flash.error {
+    border: 2px solid darkred;
+    background-color: #ff000024;
+    margin: 1em 0;
+    padding: 0.5rem;
+}
+
+.flash.error:before {
+    content: "❌";
+    margin-right: 0.5rem;
+}
