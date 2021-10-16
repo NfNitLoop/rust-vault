@@ -12,3 +12,6 @@ impl <T> TideTeraRender for T where T: tide_tera::TideTeraExt {
         self.render_body(template_name, &ctx)
     }
 }
+
+// TODO: Let people implement some state.get_tera_embed() for their app state. Then we can impl a req.render() for any tide requester
+// that has such an app state.

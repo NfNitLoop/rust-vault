@@ -1,9 +1,10 @@
 use std::{borrow::Cow, sync::Arc, time::Duration};
 
 use async_std::sync::Mutex;
-use futures::FutureExt;
-use serde::Serialize;
+use comrak::{ComrakOptions, markdown_to_html};
+use serde::{Serialize, Deserialize};
 
+use stop_token::future::FutureExt as _;
 use tera_embed::{TeraEmbed, TideTeraRender, rust_embed::{self, RustEmbed}};
 
 use crate::{VaultOpts, statics};
@@ -15,10 +16,32 @@ struct AppState {
     // Used to (less-than-gracefully) stop the server.
     // See: https://github.com/http-rs/tide/issues/528
     stopper: Arc<Mutex<stop_token::StopSource>>,
-    nav: Vec<NavItem>
+    nav: Vec<NavItem>,
+    markdown_opts: ComrakOptions,
 }
 
 type AppRequest = tide::Request<AppState>;
+
+trait RequestExt {
+    fn page(&self, title: impl Into<Cow<'static,str>>) -> Page;
+    fn render(&self, template_name: &str, params: impl serde::Serialize) -> tide::Result<tide::Body>;
+    fn render_markdown(&self, md: &str) -> String;
+}
+
+impl RequestExt for AppRequest {
+    fn page(&self, title: impl Into<Cow<'static,str>>) -> Page {
+        Page::new(self, title)
+    }
+
+    fn render(&self, template_name: &str, params: impl serde::Serialize) -> tide::Result<tide::Body> {
+        let tera = self.state().templates.tera()?;
+        tera.body(template_name, params)
+    }
+
+    fn render_markdown(&self, md: &str) -> String {
+        markdown_to_html(md, &self.state().markdown_opts)
+    }
+}
 
 #[derive(RustEmbed)]
 #[folder = "templates"]
@@ -38,6 +61,7 @@ pub(crate) async fn async_run_server(opts: &VaultOpts) -> anyhow::Result<()> {
 
     let state = AppState {
         templates: TeraEmbed::new(),
+        markdown_opts: ComrakOptions::default(),
         stopper: Arc::new(Mutex::new(stopper)),
         nav: vec![
             NavItem::new("Write", "/"),
@@ -50,16 +74,40 @@ pub(crate) async fn async_run_server(opts: &VaultOpts) -> anyhow::Result<()> {
 
     let mut app = tide::with_state(state);
 
+    app.at("/").get(|req: AppRequest| async move {
+        req.render("write.html", Write {
+            page: req.page("Write"),
+            post: String::new(),
+            preview_html: String::new(),
+        })
+    });
+
+    app.at("/").post(|mut req: AppRequest| async move {
+        let WritePost{post, preview, submit} = req.body_form().await?;
+        println!("preview: {:?}", preview);
+        println!("submit: {:?}", submit);
+
+        let preview_html = if preview.is_some() {
+            req.render_markdown(&post)
+        } else {
+            String::new()
+        };
+
+        req.render("write.html", Write {
+            page: req.page("Write"),
+            post: post,
+            preview_html,
+        })
+    });
+
     app.at("/:name").get(|req: AppRequest| async move {
-        let tera = req.state().templates.tera()?;
-        tera.body("hello.html", Greet {
+        req.render("hello.html", Greet {
             name: req.param("name")?.into(),
-            page: Page::new(&req, "Greeting")
+            page: req.page("Greeting")
         })
     });
 
     app.at("/shutdown").get(|req: AppRequest| async move {
-        let tera = req.state().templates.tera()?;
         let stopper = req.state().stopper.clone();
 
         async_std::task::spawn(async move {
@@ -72,7 +120,7 @@ pub(crate) async fn async_run_server(opts: &VaultOpts) -> anyhow::Result<()> {
             drop(stopper);
         });
 
-        tera.body("message.html", Message{
+        req.render("message.html", Message{
             page: Page::new(&req, "Shutting Down"),
             message: "The server will now shut down.".into()
         })
@@ -94,24 +142,16 @@ pub(crate) async fn async_run_server(opts: &VaultOpts) -> anyhow::Result<()> {
         }
     }
 
-    let server = server.fuse();
-    let stop = stop.fuse();
-
-    futures::pin_mut!(server, stop);
-
-    // Hacky way to shut down the server.
-    // TODO: Change when either:
-    // * Tide supports graceful shutdowns: https://github.com/http-rs/tide/issues/528
-    // * OR: stop-token fixes the FutureExt bug: https://github.com/async-rs/stop-token/issues/12
-    futures::select! {
-        result = server => {
+    match server.until(stop).await {
+        Ok(server_result) => {
             println!("Server error.");
-            return Ok(result?);
+            return Ok(server_result?);
         },
-        _ = stop => {
-            return Ok(());
+        Err(_io_err) =>  {
+            // User requested server stop.
+            return Ok(())
         }
-    };
+    }
 }
 
 
@@ -119,6 +159,20 @@ pub(crate) async fn async_run_server(opts: &VaultOpts) -> anyhow::Result<()> {
 struct Greet {
     page: Page,
     name: String,
+}
+
+#[derive(Serialize)]
+struct Write {
+    page: Page,
+    preview_html: String,
+    post: String,
+}
+
+#[derive(Deserialize)]
+struct WritePost {
+    post: String,
+    preview: Option<String>,
+    submit: Option<String>,
 }
 
 #[derive(Serialize)]

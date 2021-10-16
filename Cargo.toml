@@ -8,6 +8,7 @@ edition = "2018"
 [dependencies]
 anyhow = "*"
 structopt = "0.3"
+comrak = "*"
 
 tide = "0.16"
 async-std = { version = "1.8.0", features = ["attributes"] }
@@ -16,7 +17,7 @@ serde = { version = "1.0", features = ["derive"] }
 tera = "1.12"
 tide-tera = "0.2"
 webbrowser = "*"
-stop-token = "0.4"
+stop-token = "0.6"
 futures = "0.3"
 mime_guess = "*"
 

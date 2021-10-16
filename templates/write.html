@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block body %}
+    {% if preview_html %}
+    <div class="preview_html">{{ preview_html | safe }}</div>
+    {% endif %}
+
+    <form method="POST" action="/">
+    <textarea name="post" class="post" placeholder="No need to log in, just start writing. 😊">{{post | default(value="")}}</textarea>
+    <br><input type="submit" name="preview" value="Preview"/> <input type="submit" name="submit" value="Submit"/>
+    </form>
+
+    <script>
+        window.addEventListener("load", () => {
+            const ta = document.getElementsByTagName("textarea")[0]
+            if (ta) {
+                ta.selectionStart = ta.value.length
+                ta.selectionEnd = ta.selectionStart
+                ta.focus()
+            }
+
+        })
+    </script>
+{% endblock %}
