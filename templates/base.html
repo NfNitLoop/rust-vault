@@ -1,14 +1,14 @@
 <html>
 <head>
-    <title>{{ title | default(value="Vault") }}</title>
+    <title>{{ page.title | default(value="Vault") }}</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
-{% if nav %}
+{% if page.nav %}
     <div class="nav">
-    {% for navItem in nav %}
-        {% if navItem.link == relPath %}
+    {% for navItem in page.nav %}
+        {% if navItem.link == page.rel_path %}
             <a href="{{navItem.link}}" class="active">{{navItem.title}}</a>
         {% elif not navItem.hidden %}
             <a href="{{navItem.link}}">{{navItem.title}}</a>
@@ -16,8 +16,8 @@
     {% endfor %}
     </div>
 {% endif %}
-{% if flash %}
-    <div class="flash {{flash.type}}">{{ flash.message }}</div>
+{% if page.flash %}
+    <div class="flash {{page.flash.type}}">{{ page.flash.message }}</div>
 {% endif %}
 
 {% block body %}

@@ -129,6 +129,7 @@ async fn async_run_server() -> anyhow::Result<()> {
         });
 
         tera.body("message.html", Message{
+            page: Page::new(&req, "Shutting Down"),
             message: "The server will now shut down.".into()
         })
     });
@@ -173,19 +174,19 @@ async fn async_run_server() -> anyhow::Result<()> {
 
 #[derive(Serialize)]
 struct Greet {
-    #[serde(flatten)]
     page: Page,
     name: String,
 }
 
 #[derive(Serialize)]
 struct Message {
+    page: Page,
     message: String,
 }
 
 #[derive(Serialize)]
 struct Page {
-    relPath: Cow<'static, str>,
+    rel_path: Cow<'static, str>,
     title: Cow<'static, str>,
     nav: Vec<NavItem>,
     // TODO: flash
@@ -194,7 +195,7 @@ struct Page {
 impl Page {
     fn new(request: &AppRequest, title: impl Into<Cow<'static,str>>) -> Self {
         Self {
-            relPath: request.url().path().to_string().into(),
+            rel_path: request.url().path().to_string().into(),
             nav: request.state().nav.clone(),
             title: title.into()
         }
