@@ -1,7 +1,8 @@
 use std::{borrow::Cow, sync::Arc, time::Duration};
 
-use anyhow::{Context, bail};
+use anyhow::{Context};
 use async_std::sync::Mutex;
+use async_trait::async_trait;
 use comrak::{ComrakOptions, markdown_to_html};
 use serde::{Serialize, Deserialize};
 
@@ -152,6 +153,7 @@ pub(crate) async fn async_run_server(opts: &VaultOpts, command: &OpenCommand) ->
 
 
     let mut app = tide::with_state(state);
+    app.with(NoStore{});
 
     app.at("/").get(|req: AppRequest| async move {
         req.render("write.html", Write {
@@ -361,5 +363,27 @@ impl NavItem {
 
     fn hidden(title: impl Into<Cow<'static, str>>, link: impl Into<Cow<'static, str>>) -> Self {
         Self { hidden: true, .. Self::new(title, link)  }
+    }
+}
+
+
+// See: https://github.com/http-rs/tide/issues/854
+struct NoStore {}
+
+#[async_trait]
+impl <State: Clone + Send + Sync + 'static> tide::Middleware<State> for NoStore {
+    async fn handle<'a, 'b>(&'a self, req: tide::Request<State>, next: tide::Next<'b, State>) -> tide::Result<Response>
+    {
+        use tide::http::cache::{CacheControl, CacheDirective};
+        let mut response = next.run(req).await;
+
+        if let None = response.header("Cache-Control") {
+            let mut header = CacheControl::new();
+            header.push(CacheDirective::NoStore);
+            header.push(CacheDirective::MaxAge(Duration::from_secs(0)));
+
+            response.insert_header(header.name(), header.value());
+        }
+        Ok(response)
     }
 }
