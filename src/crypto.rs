@@ -1,3 +1,5 @@
+#[cfg(test)]
+mod tests;
 
 use std::fmt::Display;
 
@@ -97,6 +99,17 @@ impl SealedBoxPrivateKey {
         Ok(Self {
             public_key: SealedBoxPublicKey{key: private_key.public_key()},
             private_key,
+        })
+    }
+
+    // Oops, the Deno version of Vault used to give out the seed. Can try this.
+    pub fn from_base58_seed(value: &str) -> anyhow::Result<Self> {
+        let bytes = bs58::decode(value).into_vec()?;
+        let seed = box_::Seed::from_slice(&bytes).ok_or_else(|| anyhow::format_err!("Wrong number of seed bytes"))?;
+        let (public_key, private_key) = box_::keypair_from_seed(&seed);
+        Ok(Self{
+            private_key,
+            public_key: SealedBoxPublicKey {key: public_key},
         })
     }
 

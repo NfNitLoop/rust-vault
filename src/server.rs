@@ -1,5 +1,6 @@
 use std::{borrow::Cow, sync::Arc, time::Duration};
 
+use anyhow::{Context, bail};
 use async_std::sync::Mutex;
 use comrak::{ComrakOptions, markdown_to_html};
 use serde::{Serialize, Deserialize};
@@ -8,7 +9,20 @@ use stop_token::future::FutureExt as _;
 use tera_embed::{TeraEmbed, TideTeraRender, rust_embed::{self, RustEmbed}};
 use tide::{Response, http::{Cookie}};
 
-use crate::{OpenCommand, VaultOpts, crypto::{SealedBoxPrivateKey, SealedBoxPublicKey, SecretBox}, statics};
+use crate::{
+    OpenCommand,
+    VaultOpts,
+    crypto::{
+        SealedBoxPrivateKey,
+        SealedBoxPublicKey,
+        SecretBox
+    }, 
+    db::{
+        self,
+        VaultExt,
+    },
+    statics
+};
 
 #[derive(Clone)]
 struct AppState {
@@ -109,17 +123,16 @@ pub(crate) async fn async_run_server(opts: &VaultOpts, command: &OpenCommand) ->
         tide::log::start();
     }
 
-    let file_name = command.sqlite_file.to_str().ok_or_else(|| anyhow::format_err!("Invalid SQLite file name"))?;
-    let pool = sqlx::SqlitePool::connect(file_name).await?;
-    // TODO: pool.check_version()?;
+    let pool = db::pool(db::options(&command.sqlite_file));
+
+    if pool.needs_upgrade().await? {
+        anyhow::bail!("Database needs an upgrade");
+    }
+
+    let public_key = pool.public_key().await.context("getting public key")?;
 
     let stopper = stop_token::StopSource::new();
     let stop = stopper.token();
-
-    let secret_key = SealedBoxPrivateKey::generate();
-    println!("pub key: {}", secret_key.public());
-    println!("priv key: {}", secret_key);
-
 
     sodiumoxide::init().map_err(|_| anyhow::format_err!("Error initializing sodiumoxide."))?;
     let state = AppState {
@@ -128,7 +141,7 @@ pub(crate) async fn async_run_server(opts: &VaultOpts, command: &OpenCommand) ->
         markdown_opts: ComrakOptions::default(),
         stopper: Arc::new(Mutex::new(stopper)),
         secret_box: SecretBox::generate(),
-        public_key: secret_key.public().clone(),
+        public_key,
         nav: vec![
             NavItem::new("Write", "/"),
             NavItem::hidden("Log In", "/login"),
@@ -195,21 +208,30 @@ pub(crate) async fn async_run_server(opts: &VaultOpts, command: &OpenCommand) ->
         let form: LogInForm = req.body_form().await?;
         let secret = SealedBoxPrivateKey::from_base58(&form.secret);
 
-        if let Ok(secret) = secret {
-            if secret.public() == &req.state().public_key {
-                let mut res: Response = tide::Redirect::see_other("/read").into();
-                let cookie = req.set_priv_key(secret.bytes());
-                res.insert_cookie(cookie);
-                return Ok(res);
-            } else {
+        match secret {
+            Err(err) => println!("Bad secret. {:?}", err),
+            Ok(secret) => {
+                let server_key = &req.state().public_key;
+
+                if secret.public() == server_key {
+                    let mut res: Response = tide::Redirect::see_other("/read").into();
+                    let cookie = req.set_priv_key(secret.bytes());
+                    res.insert_cookie(cookie);
+                    return Ok(res);
+                } 
                 println!("Login attempt with incorrect private key.");
+
+                // TRY treating the private key as a seed.
+                // The Deno version used to hand out the seed.
+                if let Ok(secret) = SealedBoxPrivateKey::from_base58_seed(&form.secret) {
+                    if secret.public() == server_key {
+                        println!("You supplied the seed for the private key.");
+                        println!("Instead, use the private key: {}", &secret);
+                    }
+                }
             }
-        } else {
-            println!("Bad secret.");
         }
         
-        
-
         let body = req.render("login.html", LogIn{
             page: req.page("Log In")
         })?;
