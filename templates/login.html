@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block body %}
+    <p>You must log in to read previous posts.</p>
+    <form method="POST" action="/login">
+        <input type="password" name="secret">
+        <br><input type="submit" value="Log in">
+    </form>
+{% endblock %}

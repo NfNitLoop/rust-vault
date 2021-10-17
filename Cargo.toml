@@ -7,8 +7,11 @@ edition = "2018"
 
 [dependencies]
 anyhow = "*"
+bs58 = { version = "*", features = ["check"] }
 structopt = "0.3"
+sodiumoxide = "*"
 comrak = "*"
+sqlx = { version = "*", features = ["sqlite", "runtime-async-std-native-tls"] }
 
 tide = "0.16"
 async-std = { version = "1.8.0", features = ["attributes"] }

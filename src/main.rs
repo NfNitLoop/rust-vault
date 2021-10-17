@@ -2,6 +2,8 @@ use std::{path::PathBuf};
 
 use structopt::StructOpt;
 
+mod crypto;
+mod db;
 mod statics;
 mod server;
 
@@ -36,7 +38,7 @@ struct OpenCommand {
 
 impl OpenCommand {
     fn run(&self, opts: &VaultOpts) -> anyhow::Result<()> {
-        async_std::task::block_on(server::async_run_server(opts))
+        async_std::task::block_on(server::async_run_server(opts, self))
     }
 }
 
