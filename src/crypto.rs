@@ -121,6 +121,11 @@ impl SealedBoxPrivateKey {
         )
     }
 
+    pub fn decrypt_string(&self, bytes: &[u8]) -> anyhow::Result<String> {
+        let decrypted = self.decrypt(bytes)?;
+        Ok(String::from_utf8(decrypted)?)
+    }
+
     pub fn bytes(&self) -> &[u8] {
         return &self.private_key.as_ref();
     }

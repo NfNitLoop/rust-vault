@@ -56,7 +56,7 @@ trait RequestExt {
     fn encrypt_bytes(&self, cookie: &mut Cookie, data: &[u8] );
 
     // If the user is logged in w/ their private key, we can decrypt posts:
-    fn get_priv_key(&self) -> anyhow::Result<Option<Vec<u8>>>;
+    fn get_priv_key(&self) -> anyhow::Result<Option<SealedBoxPrivateKey>>;
     fn logged_in(&self) -> bool;
     fn set_priv_key(&self, key: &[u8]) -> Cookie<'static>;
     // fn db(&self) -> sqlx::SqliteConnection;
@@ -87,12 +87,17 @@ impl RequestExt for AppRequest {
         cookie.set_value(bs58::encode(cypher).into_string());
     }
 
-    fn get_priv_key(&self) -> anyhow::Result<Option<Vec<u8>>> {
+    fn get_priv_key(&self) -> anyhow::Result<Option<SealedBoxPrivateKey>> {
         let cookie = match self.cookie(PRIV_KEY_COOKIE) {
             Some(c) => c,
             None => return Ok(None),
         };
-        self.decrypt_bytes(&cookie)
+        let key_bytes = match self.decrypt_bytes(&cookie)? {
+            None => return Ok(None),
+            Some(b) => b,
+        };
+
+        Ok(Some(SealedBoxPrivateKey::from_bytes(&key_bytes)?))
     }
 
     fn set_priv_key(&self, key: &[u8]) -> Cookie<'static> {
@@ -182,23 +187,7 @@ pub(crate) async fn async_run_server(opts: &VaultOpts, command: &OpenCommand) ->
     });
 
     app.at("/read")
-    .get(|req: AppRequest| async move {
-        if !req.logged_in() {
-            let res: Response = tide::Redirect::temporary("/login").into();
-            return Ok(res);
-        }
-
-        // TODO: Pagination.
-        let posts = Posts{
-            page: req.page("Read Posts"),
-            posts: vec![]
-        };
-        let res: Response = match req.render("posts.html", posts) {
-            Ok(body) => body.into(),
-            Err(err) => err.into(),
-        };
-        Ok(res)
-    });
+    .get(read_posts);
 
     app.at("/login")
     .get(|req: AppRequest| async move {
@@ -287,6 +276,48 @@ pub(crate) async fn async_run_server(opts: &VaultOpts, command: &OpenCommand) ->
     }
 }
 
+async fn read_posts(req: AppRequest) -> tide::Result<tide::Response> {
+    if !req.logged_in() {
+        let res: Response = tide::Redirect::temporary("/login").into();
+        return Ok(res);
+    }
+
+    let key = req.get_priv_key()?.expect("User is logged in");
+
+    let query: ReadQuery = req.query()?;
+
+    let db = &req.state().db;
+    let posts: anyhow::Result<Vec<Post>> = db
+        .get_posts(&query)
+        .await?
+        .into_iter()
+        .map(|e| entry_to_post(e, &req, &key))
+        .collect();
+
+    let posts = Posts{
+        page: req.page("Read Posts"),
+        posts: posts?,
+    };
+    let res: Response = match req.render("posts.html", posts) {
+        Ok(body) => body.into(),
+        Err(err) => err.into(),
+    };
+    Ok(res)
+}
+
+fn entry_to_post(entry: db::Entry, req: &AppRequest, key: &SealedBoxPrivateKey) -> anyhow::Result<Post> {
+    let markdown = key.decrypt_string(&entry.contents)?;
+    let html = req.render_markdown(&markdown);
+
+    let post = Post{
+        html,
+        // TODO: Pretty dates.
+        timestamp: format!("{}", entry.timestamp_ms_utc),
+    };
+
+    Ok(post)
+}
+
 #[derive(Serialize)]
 struct Write {
     page: Page,
@@ -301,6 +332,18 @@ struct WritePost {
     submit: Option<String>,
 }
 
+/// The HTTP query params for the /read page.
+#[derive(Deserialize)]
+pub(crate) struct ReadQuery {
+    pub(crate) offset: Option<usize>,
+
+    pub(crate) limit: Option<usize>,
+
+    // TODO:
+    // #[serde(default)]
+    // chronological: bool,
+}
+
 #[derive(Serialize)]
 struct Message {
     page: Page,
@@ -308,9 +351,9 @@ struct Message {
 }
 
 #[derive(Serialize)]
-struct Post {
-    timestamp: String,
-    html: String,
+pub(crate) struct Post {
+    pub(crate) timestamp: String,
+    pub(crate) html: String,
 }
 
 #[derive(Serialize)]
