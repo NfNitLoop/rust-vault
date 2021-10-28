@@ -422,6 +422,7 @@ struct Flash {
     flash_type: FlashType,
 }
 
+#[allow(dead_code)]
 #[derive(Serialize)]
 #[serde(rename_all = "lowercase")]
 enum FlashType {
@@ -468,21 +469,4 @@ impl <State: Clone + Send + Sync + 'static> tide::Middleware<State> for NoStore 
         }
         Ok(response)
     }
-}
-
-
-fn get_timestamp_ms_utc() -> i64 {
-    use std::time::SystemTime;
-
-    let now = SystemTime::now();
-    if let Ok(delta) = now.duration_since(SystemTime::UNIX_EPOCH) {
-        return delta.as_millis() as i64;
-    }
-
-    if let Ok(delta) = SystemTime::UNIX_EPOCH.duration_since(now) {
-        return -(delta.as_millis() as i64);
-    }
-
-    panic!("System time is neither before nor >= UNIX_EPOCH!?");
-
 }
