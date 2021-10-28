@@ -9,6 +9,7 @@ edition = "2018"
 anyhow = "*"
 async-trait = "*"
 bs58 = { version = "*", features = ["check"] }
+chrono = "0.4"
 structopt = "0.3"
 sodiumoxide = "*"
 comrak = "*"

@@ -29,13 +29,11 @@ pub(crate) trait VaultExt {
     async fn needs_upgrade(&self) -> anyhow::Result<bool>;
     async fn public_key(&self) -> anyhow::Result<crypto::SealedBoxPublicKey>;
     async fn get_posts(&self, query: &ReadQuery) -> anyhow::Result<Vec<Entry>>;
-
-
+    async fn write_entry(&self, entry: Entry) -> anyhow::Result<()>;
 }
 
 #[async_trait]
 impl VaultExt for sqlx::Pool<sqlx::Sqlite> {
-
     
     async fn get_posts(&self, query: &ReadQuery) -> anyhow::Result<Vec<Entry>> {
         let entries = sqlx::query_as("
@@ -51,6 +49,19 @@ impl VaultExt for sqlx::Pool<sqlx::Sqlite> {
         Ok(entries)
     }
 
+    async fn write_entry(&self, entry: Entry) -> anyhow::Result<()> {
+        let Entry{timestamp_ms_utc, offset_utc_mins, contents} = entry;
+        sqlx::query("
+                INSERT INTO entry(timestamp_ms_utc, offset_utc_mins, contents)
+                VALUES(?,?,?)
+            ")
+            .bind(timestamp_ms_utc)
+            .bind(offset_utc_mins)
+            .bind(contents)
+            .execute(self).await?;
+
+        Ok(())
+    }
 
     async fn get_version(&self) -> anyhow::Result<u32> {
         let (version_str,): (String,) = query_as("SELECT value FROM settings WHERE key = 'version'")
@@ -61,6 +72,7 @@ impl VaultExt for sqlx::Pool<sqlx::Sqlite> {
         Ok(version)
     }
 
+    // TODO: Separate out the println bits into a different method.
     async fn needs_upgrade(&self) -> anyhow::Result<bool> {
         let version = self.get_version().await?;
         if version == DB_VERSION {

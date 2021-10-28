@@ -3,6 +3,7 @@ use std::{borrow::Cow, sync::Arc, time::Duration};
 use anyhow::{Context};
 use async_std::sync::Mutex;
 use async_trait::async_trait;
+use chrono::Offset;
 use comrak::{ComrakOptions, markdown_to_html};
 use serde::{Serialize, Deserialize};
 
@@ -10,20 +11,11 @@ use stop_token::future::FutureExt as _;
 use tera_embed::{TeraEmbed, TideTeraRender, rust_embed::{self, RustEmbed}};
 use tide::{Response, http::{Cookie}};
 
-use crate::{
-    OpenCommand,
-    VaultOpts,
-    crypto::{
+use crate::{OpenCommand, VaultOpts, crypto::{
         SealedBoxPrivateKey,
         SealedBoxPublicKey,
         SecretBox
-    }, 
-    db::{
-        self,
-        VaultExt,
-    },
-    statics
-};
+    }, db::{self, Entry, VaultExt}, statics};
 
 #[derive(Clone)]
 struct AppState {
@@ -169,21 +161,29 @@ pub(crate) async fn async_run_server(opts: &VaultOpts, command: &OpenCommand) ->
     });
 
     app.at("/").post(|mut req: AppRequest| async move {
-        let WritePost{post, preview, submit} = req.body_form().await?;
-        println!("preview: {:?}", preview);
-        println!("submit: {:?}", submit);
+        let WritePost{mut post, preview, submit} = req.body_form().await?;
 
-        let preview_html = if preview.is_some() {
-            req.render_markdown(&post)
-        } else {
-            String::new()
-        };
+        let mut page = req.page("Write");
+        let mut preview_html = String::new();
 
-        req.render("write.html", Write {
-            page: req.page("Write"),
-            post: post,
-            preview_html,
-        })
+        if submit.is_some() {
+            let db = &req.state().db;
+            let key = &req.state().public_key;
+            let now = chrono::Local::now();
+            let entry = Entry{
+                timestamp_ms_utc: now.timestamp_millis(),
+                offset_utc_mins: now.offset().fix().local_minus_utc() / 60,
+                contents: key.encrypt(post.as_bytes()),
+            };
+            db.write_entry(entry).await?;
+            post = String::new();
+            page.flash_success("Post saved.");
+
+        } else if preview.is_some() {
+            preview_html = req.render_markdown(&post)
+        } 
+
+        req.render("write.html", Write { page, post, preview_html })
     });
 
     app.at("/read")
@@ -293,11 +293,25 @@ async fn read_posts(req: AppRequest) -> tide::Result<tide::Response> {
         .into_iter()
         .map(|e| entry_to_post(e, &req, &key))
         .collect();
+    let posts = posts?;
 
-    let posts = Posts{
-        page: req.page("Read Posts"),
-        posts: posts?,
-    };
+    let mut page = req.page("Read Posts");
+    let offset = query.offset.unwrap_or(0);
+    let limit = query.limit.unwrap_or(50);
+    if offset > 0 {
+        page.previous.replace(NavItem::new(
+            "Previous", 
+            format!("{}?offset={}&limit={}", req.url().path(), offset-limit, limit)
+        ));
+    }
+    if !posts.is_empty() {
+        page.next.replace(NavItem::new(
+            "Next",
+            format!("{}?offset={}&limit={}", req.url().path(), offset+limit, limit)
+        ));
+    }
+
+    let posts = Posts{page, posts};
     let res: Response = match req.render("posts.html", posts) {
         Ok(body) => body.into(),
         Err(err) => err.into(),
@@ -378,7 +392,9 @@ struct Page {
     rel_path: Cow<'static, str>,
     title: Cow<'static, str>,
     nav: Vec<NavItem>,
-    // TODO: flash
+    flash: Option<Flash>,
+    previous: Option<NavItem>,
+    next: Option<NavItem>,
 }
 
 impl Page {
@@ -386,9 +402,32 @@ impl Page {
         Self {
             rel_path: request.url().path().to_string().into(),
             nav: request.state().nav.clone(),
-            title: title.into()
+            title: title.into(),
+            flash: None,
+            next: None,
+            previous: None,
         }
     }
+
+    fn flash_success(&mut self, message: impl Into<String>) {
+
+        self.flash.replace(Flash { message: message.into(), flash_type: FlashType::SUCCESS });
+    }
+}
+
+#[derive(Serialize)]
+struct Flash {
+    message: String,
+    #[serde(rename="type")]
+    flash_type: FlashType,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "lowercase")]
+enum FlashType {
+    SUCCESS,
+    WARNING,
+    ERROR,
 }
 
 
@@ -429,4 +468,21 @@ impl <State: Clone + Send + Sync + 'static> tide::Middleware<State> for NoStore 
         }
         Ok(response)
     }
+}
+
+
+fn get_timestamp_ms_utc() -> i64 {
+    use std::time::SystemTime;
+
+    let now = SystemTime::now();
+    if let Ok(delta) = now.duration_since(SystemTime::UNIX_EPOCH) {
+        return delta.as_millis() as i64;
+    }
+
+    if let Ok(delta) = SystemTime::UNIX_EPOCH.duration_since(now) {
+        return -(delta.as_millis() as i64);
+    }
+
+    panic!("System time is neither before nor >= UNIX_EPOCH!?");
+
 }

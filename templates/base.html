@@ -17,6 +17,18 @@
     {% endfor %}
     </div>
 {% endif %}
+
+{% if page.next or page.previous %}
+<pagination-bar>
+    {% if page.previous %}
+        <a href="{{page.previous.link}}" class="previous">{{page.previous.title}}</a>
+    {% endif %}
+    {% if page.next %}
+        <a href="{{page.next.link}}" class="next">{{page.next.title}}</a>
+    {% endif %}
+</pagination-bar>
+{% endif %}
+
 {% if page.flash %}
     <div class="flash {{page.flash.type}}">{{ page.flash.message }}</div>
 {% endif %}
@@ -24,4 +36,15 @@
 {% block body %}
 Body goes here
 {% endblock %}
+
+{% if page.next or page.previous %}
+<pagination-bar>
+    {% if page.previous %}
+        <a href="{{page.previous.link}}" class="previous">{{page.previous.title}}</a>
+    {% endif %}
+    {% if page.next %}
+        <a href="{{page.next.link}}" class="next">{{page.next.title}}</a>
+    {% endif %}
+</pagination-bar>
+{% endif %}
 </body>

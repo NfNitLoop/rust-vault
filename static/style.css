@@ -1,12 +1,41 @@
-.nav a {
+.nav a, pagination-bar a {
     display: inline-block;
     border-radius: 5px;
-    padding: 5px;
+    padding: 7px;
     background-color: #888;
     color: white;
     text-decoration: none;
     cursor: pointer;
     margin: 3px;
+}
+
+pagination-bar {
+    display: grid;
+    width: 100%;
+    margin-top: 0.5rem;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-areas: "left . right";
+    /* margin-bottom: 0.5rem; */
+    /* background: red; */
+}
+
+pagination-bar .next {
+    grid-area: right;
+    justify-self: end;
+}
+
+pagination-bar .next::after {
+    margin-left: 0.5em;
+    content: "➡"
+}
+
+pagination-bar .previous::before {
+    margin-right: 0.5em;
+    content: "⬅"
+}
+
+pagination-bar .previous {
+    justify-self: start;
 }
 
 .nav a.active {
