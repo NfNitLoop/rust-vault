@@ -6,28 +6,35 @@
 </head>
 <body>
 
-{% if page.nav %}
-    <div class="nav">
-    {% for navItem in page.nav %}
-        {% if navItem.link == page.rel_path %}
-            <a href="{{navItem.link}}" class="active">{{navItem.title}}</a>
-        {% elif not navItem.hidden %}
-            <a href="{{navItem.link}}">{{navItem.title}}</a>
+<body-main>
+
+{% if page.nav or page.next or page.previous %}
+    <nav-bar>
+        <nav-left>
+        {% if page.previous %}
+            <a href="{{page.previous.link}}">{{page.previous.title}}</a>
         {% endif %}
-    {% endfor %}
-    </div>
+        </nav-left>
+    
+        <nav-mid>
+        {% for navItem in page.nav %}
+            {% if navItem.link == page.rel_path %}
+                <a href="{{navItem.link}}" class="active">{{navItem.title}}</a>
+            {% elif not navItem.hidden %}
+                <a href="{{navItem.link}}">{{navItem.title}}</a>
+            {% endif %}
+        {% endfor %}
+        </nav-mid>
+
+        <nav-right>
+        {% if page.next %}
+            <a href="{{page.next.link}}">{{page.next.title}}</a>
+        {% endif %}
+        </nav-right>
+
+    </nav-bar>
 {% endif %}
 
-{% if page.next or page.previous %}
-<pagination-bar>
-    {% if page.previous %}
-        <a href="{{page.previous.link}}" class="previous">{{page.previous.title}}</a>
-    {% endif %}
-    {% if page.next %}
-        <a href="{{page.next.link}}" class="next">{{page.next.title}}</a>
-    {% endif %}
-</pagination-bar>
-{% endif %}
 
 {% if page.flash %}
     <div class="flash {{page.flash.type}}">{{ page.flash.message }}</div>
@@ -37,14 +44,4 @@
 Body goes here
 {% endblock %}
 
-{% if page.next or page.previous %}
-<pagination-bar>
-    {% if page.previous %}
-        <a href="{{page.previous.link}}" class="previous">{{page.previous.title}}</a>
-    {% endif %}
-    {% if page.next %}
-        <a href="{{page.next.link}}" class="next">{{page.next.title}}</a>
-    {% endif %}
-</pagination-bar>
-{% endif %}
 </body>

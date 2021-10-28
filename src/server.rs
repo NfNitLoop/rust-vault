@@ -3,7 +3,7 @@ use std::{borrow::Cow, sync::Arc, time::Duration};
 use anyhow::{Context};
 use async_std::sync::Mutex;
 use async_trait::async_trait;
-use chrono::Offset;
+use chrono::{FixedOffset, Offset};
 use comrak::{ComrakOptions, markdown_to_html};
 use serde::{Serialize, Deserialize};
 
@@ -320,16 +320,19 @@ async fn read_posts(req: AppRequest) -> tide::Result<tide::Response> {
 }
 
 fn entry_to_post(entry: db::Entry, req: &AppRequest, key: &SealedBoxPrivateKey) -> anyhow::Result<Post> {
+    use chrono::TimeZone;
+
     let markdown = key.decrypt_string(&entry.contents)?;
     let html = req.render_markdown(&markdown);
 
-    let post = Post{
-        html,
-        // TODO: Pretty dates.
-        timestamp: format!("{}", entry.timestamp_ms_utc),
-    };
+    let offset_secs = entry.offset_utc_mins * 60;
+    let timestamp = FixedOffset::east(offset_secs).timestamp_millis(entry.timestamp_ms_utc);
+    let timestamp = timestamp.format("%a %B %e, %Y - %T %z").to_string();
 
-    Ok(post)
+    Ok(Post{
+        html,
+        timestamp,
+    })
 }
 
 #[derive(Serialize)]

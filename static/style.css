@@ -1,4 +1,57 @@
-.nav a, pagination-bar a {
+/* TODO: Download */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif&display=swap');
+
+html {
+    --body-bg: #fff;
+    --html-bg: #eee;
+
+
+    background: var(--html-bg);
+    padding: 0;
+}
+
+html, textarea, button, input {
+    font-family: "Noto Serif", serif;
+    font-size: 18pt;
+}
+
+body {
+    margin: 0;
+}
+
+body-main {
+    display: block;
+    max-width: 45rem;
+    margin: auto;
+    background: var(--body-bg);
+    padding: 0.5rem 1rem;
+}
+
+nav-bar {
+    display: flex;
+    justify-content: space-between;
+    position: sticky;
+    top: 0px;
+    background: var(--html-bg);
+    padding: 0.5rem 0;
+    margin-left: -1rem;
+    margin-right: -1rem;
+    margin-top: -0.5rem;
+}
+
+nav-mid {
+    flex-grow: 1;
+    text-align: center;
+}
+
+nav-left, nav-right {
+    min-width: 20%;
+}
+nav-right {
+    text-align: right;
+}
+
+nav-bar a, pagination-bar a {
     display: inline-block;
     border-radius: 5px;
     padding: 7px;
@@ -24,12 +77,12 @@ pagination-bar .next {
     justify-self: end;
 }
 
-pagination-bar .next::after {
+nav-right a::after {
     margin-left: 0.5em;
     content: "➡"
 }
 
-pagination-bar .previous::before {
+nav-left a::before {
     margin-right: 0.5em;
     content: "⬅"
 }
@@ -44,7 +97,7 @@ pagination-bar .previous {
 
 textarea.post {
     min-height: 20em;
-    width: 60em;
+    width: 100%;
     margin: 1rem 0;
 }
 
