@@ -301,7 +301,7 @@ async fn read_posts(req: AppRequest) -> tide::Result<tide::Response> {
     if offset > 0 {
         page.previous.replace(NavItem::new(
             "Previous", 
-            format!("{}?offset={}&limit={}", req.url().path(), offset-limit, limit)
+            format!("{}?offset={}&limit={}", req.url().path(), offset.saturating_sub(limit), limit)
         ));
     }
     if !posts.is_empty() {
