@@ -17,36 +17,8 @@ pub mod tide_tera_ext;
 #[cfg(feature="tide-tera")]
 pub use tide_tera_ext::*;
 
-pub struct TeraEmbed<R: RustEmbed> {
-    _embed: PhantomData<R>,
-}
-
-impl <R: RustEmbed> TeraEmbed<R> {
-    pub fn new() -> Self {
-        Self { _embed: PhantomData::default() }
-    }
-
-    pub fn tera(&self) -> tera::Result<Box<Tera>> {
-        let mut t = Tera::default();
-        let mut templates = vec![];
-
-        for file_name in R::iter() {
-            let file = R::get(&file_name).expect("RustEmbed file should exist");
-            let file_str = String::from_utf8_lossy(file.data.as_ref()).to_string();
-            templates.push(
-                (file_name, file_str)
-            );
-        }
-        t.add_raw_templates(templates)?;
-        Ok(Box::new(t))
-    }
-}
-
-impl <R: RustEmbed> Clone for TeraEmbed<R> {
-    fn clone(&self) -> Self {
-        Self { _embed: self._embed.clone() }
-    }
-}
+mod embed;
+pub use embed::TeraEmbed;
 
 /// Render templates based on a struct, similar to in Askama.
 /// 
