@@ -8,10 +8,6 @@
 pub use rust_embed;
 pub use tera;
 
-use rust_embed::RustEmbed;
-use tera::Tera;
-use std::marker::PhantomData;
-
 #[cfg(feature="tide-tera")]
 pub mod tide_tera_ext;
 #[cfg(feature="tide-tera")]

@@ -121,7 +121,7 @@ pub(crate) async fn async_run_server(opts: &VaultOpts, command: &OpenCommand) ->
         tide::log::start();
     }
 
-    let pool = db::pool(db::options(&command.sqlite_file));
+    let pool = db::pool(db::options(&command.opts.sqlite_file));
 
     if pool.needs_upgrade().await? {
         anyhow::bail!("Database needs an upgrade");
@@ -250,19 +250,22 @@ pub(crate) async fn async_run_server(opts: &VaultOpts, command: &OpenCommand) ->
 
     app.at("/static/*path").get(statics::serve::<Statics, AppState>);
 
-    let host_and_port = "127.0.0.1:8080";
+    let host_and_port = format!("127.0.0.1:{port}", port=command.opts.port);
 
-    let server = app.listen(host_and_port);
+    let server = app.listen(&host_and_port);
 
     let url = format!("http://{}/", host_and_port);
 
-    println!("Server running at: {}", &url);
-    match webbrowser::open(&url) {
-        Ok(_) => {},
-        Err(_) => {
-            println!("Couldn't open browser.");
+    if !command.opts.no_browser {
+        match webbrowser::open(&url) {
+            Ok(_) => {},
+            Err(_) => {
+                println!("Couldn't open browser.");
+            }
         }
     }
+
+    println!("Server running at: {}", &url);
 
     match server.until(stop).await {
         Ok(server_result) => {

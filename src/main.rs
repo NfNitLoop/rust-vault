@@ -29,16 +29,30 @@ struct VaultOpts {
 #[derive(StructOpt)]
 enum MainCommands {
     Open(OpenCommand),
+    Serve(ServeCommand),
     Init(InitCommand),
     // #[structopt(setting(structopt::clap::AppSettings::Hidden))] // Not yet implemented.
     // Upgrade(UpgradeCommand),
 }
 
-#[derive(StructOpt)]
-#[structopt(about = "Open the database for writing/reading")]
+#[derive(StructOpt, Clone)]
+#[structopt(about = "Open the database for writing/reading.")]
 struct OpenCommand {
+    #[structopt(flatten)]
+    opts: OpenOpts,
+}
+
+#[derive(StructOpt, Clone)]
+struct OpenOpts {
     #[structopt(parse(from_os_str))]
     sqlite_file: PathBuf,
+
+    /// Don't open a browser to the server automatically.
+    #[structopt(long)]
+    no_browser: bool,
+
+    #[structopt(long, default_value="8080")]
+    port: u16,
 }
 
 impl OpenCommand {
@@ -46,6 +60,23 @@ impl OpenCommand {
         block_on(server::async_run_server(opts, self))
     }
 }
+
+#[derive(StructOpt)]
+#[structopt(about = "Alias for 'open --no-browser'")]
+struct ServeCommand {
+    #[structopt(flatten)]
+    opts: OpenOpts,
+}
+
+impl ServeCommand {
+    fn run(&self, opts: &VaultOpts) -> anyhow::Result<()> {
+        let mut open = OpenCommand{ 
+            opts: self.opts.clone()
+        };
+        open.opts.no_browser = true;
+        open.run(opts)
+    }
+} 
 
 #[derive(StructOpt)]
 #[structopt(about = "Initialize a new database file")]
@@ -89,6 +120,7 @@ impl VaultOpts {
         match &self.command {
             MainCommands::Init(cmd) => cmd.run(&self),
             MainCommands::Open(cmd) => cmd.run(&self),
+            MainCommands::Serve(cmd) => cmd.run(&self),
             // MainCommands::Upgrade(cmd) => cmd.run(&self),
         }
     }
